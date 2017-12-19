@@ -69,5 +69,10 @@ migrate() {
 }
 
 # Run a desired action
-# FIXME: Match a kind of pattern of valid subcommand names or so
-$SUBCOMMAND
+if [[ $SUBCOMMAND =~ ^(up|migrate)$ ]]; then
+    $SUBCOMMAND
+    exit 0
+else
+    echo "dodoo: $SUBCOMMAND is not a valid subcommand."
+    exit 1
+fi
