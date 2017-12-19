@@ -2,11 +2,13 @@
 POSITIONAL=()
 
 up() {
-    docker-compose run --rm -e DB_NAME="$DBNAME" -p "$PORT":8069 odoo odoo --workers=0 ${QUIET:-} ${POSITIONAL:-}
+    docker-compose run --rm -e DB_NAME="$DBNAME" -p "$PORT":8069 odoo odoo --workers=0 ${LOG_HANDLER:-} ${POSITIONAL:-}
 }
 
 SUBCOMMAND="$1"
 shift
+
+# LOG_HANDLER=""
 
 while [ $# -gt 0 ]
 do
@@ -24,7 +26,11 @@ do
             shift
             ;;
         -q|--quiet)
-            QUIET='--log-handler=werkzeug:WARNING'
+            if [ ! -z "$LOG_HANDLER" ]; then
+                LOG_HANDLER="$LOG_HANDLER,werkzeug:WARNING"
+            else
+                LOG_HANDLER="werkzeug:WARNING"
+            fi
             shift
             ;;
         *)
@@ -36,6 +42,9 @@ done
 
 PORT=${PORT:-'80'}
 DBNAME=${DBNAME:-'odoodb'}
+if [ ! -z "$LOG_HANDLER" ]; then
+    LOG_HANDLER="--log-handler=$LOG_HANDLER"
+fi
 
 case $SUBCOMMAND in
     up)
