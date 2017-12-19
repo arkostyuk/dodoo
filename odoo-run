@@ -1,5 +1,13 @@
 #!/usr/bin/env bash
 POSITIONAL=()
+
+up() {
+    docker-compose run --rm -e DB_NAME="$DBNAME" -p "$PORT":8069 odoo odoo --workers=0 ${QUIET:-} ${POSITIONAL:-}
+}
+
+SUBCOMMAND="$1"
+shift
+
 while [ $# -gt 0 ]
 do
     key="$1"
@@ -29,4 +37,8 @@ done
 PORT=${PORT:-'80'}
 DBNAME=${DBNAME:-'odoodb'}
 
-docker-compose run --rm -e DB_NAME="$DBNAME" -p "$PORT":8069 odoo odoo --workers=0 ${QUIET:-} ${POSITIONAL:-}
+case $SUBCOMMAND in
+    up)
+        up
+        ;;
+esac
