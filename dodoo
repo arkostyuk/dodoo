@@ -2,8 +2,7 @@
 POSITIONAL=()
 
 # Parse input
-SUBCOMMAND="$1"
-shift
+SUBCOMMAND="$1"; shift
 
 # LOG_HANDLER=""
 
@@ -13,27 +12,18 @@ do
 
     case $key in
         -d|--dbname)
-            DBNAME="$2"
-            shift
-            shift
-            ;;
+            DBNAME="$2"; shift; shift ;;
         -p|--port)
-            PORT="$2"
-            shift
-            shift
-            ;;
+            PORT="$2"; shift; shift ;;
         -q|--quiet)
             if [ ! -z "$LOG_HANDLER" ]; then
                 LOG_HANDLER="$LOG_HANDLER,werkzeug:WARNING"
             else
                 LOG_HANDLER="werkzeug:WARNING"
             fi
-            shift
-            ;;
+            shift ;;
         *)
-            POSITIONAL+=("$1")
-            shift
-            ;;
+            POSITIONAL+=("$1"); shift ;;
     esac
 done
 
