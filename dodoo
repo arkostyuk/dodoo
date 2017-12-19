@@ -52,6 +52,6 @@ fi
 # Run a desired action
 case $SUBCOMMAND in
     up)
-        up
+        $SUBCOMMAND
         ;;
 esac
