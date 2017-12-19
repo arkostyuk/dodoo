@@ -73,8 +73,16 @@ migrate() {
     $DCR -e MARABUNTA_FORCE_VERSION=$VERSION -e DB_NAME=$DBNAME odoo migrate
 }
 
+dropdb() {
+    if [[ "$DBNAME" == "odoodb" && ! $FORCE -eq 1  ]]; then
+        echo 'Refusing to drop odoodb; you must call dodoo with --force to do so.'
+        exit 1
+    fi
+    $DCR odoo odoo dropdb $DBNAME
+}
+
 # Run a desired action
-if [[ $SUBCOMMAND =~ ^(up|migrate)$ ]]; then
+if [[ $SUBCOMMAND =~ ^(up|migrate|dropdb)$ ]]; then
     $SUBCOMMAND
     exit 0
 else
