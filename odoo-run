@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+POSITIONAL=()
+while [ $# -gt 0 ]
+do
+    key="$1"
+
+    case $key in
+        -p|--port)
+            PORT="$2"
+            shift
+            shift
+            ;;
+        -d|--dbname)
+            DBNAME="$2"
+            shift
+            shift
+            ;;
+        -q|--quiet)
+            QUIET='--log-handler=werkzeug:WARNING'
+            shift
+            ;;
+        *)
+            POSITIONAL+=("$1")
+            shift
+            ;;
+    esac
+done
+
+PORT=${PORT:-'80'}
+DBNAME=${DBNAME:-'odoodb'}
+
+docker-compose run --rm -e DB_NAME="$DBNAME" -p "$PORT":8069 odoo odoo --workers=0 ${QUIET:-} ${POSITIONAL:-}
