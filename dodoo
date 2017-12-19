@@ -40,8 +40,5 @@ up() {
 }
 
 # Run a desired action
-case $SUBCOMMAND in
-    up)
-        $SUBCOMMAND
-        ;;
-esac
+# FIXME: Match a kind of pattern of valid subcommand names or so
+$SUBCOMMAND
