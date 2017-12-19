@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 POSITIONAL=()
 
+# Used way too often
+DCR='docker-compose run --rm'
+
 # Parse input
 SUBCOMMAND="$1"; shift
 
@@ -38,7 +41,7 @@ fi
 
 # Define subcommands
 up() {
-    docker-compose run --rm -e DB_NAME="$DBNAME" -p "$PORT":8069 odoo odoo --workers=0 ${LOG_HANDLER:-} ${POSITIONAL:-}
+    $DCR -e DB_NAME="$DBNAME" -p "$PORT":8069 odoo odoo --workers=0 ${LOG_HANDLER:-} ${POSITIONAL:-}
 }
 
 migrate() {
@@ -65,7 +68,7 @@ migrate() {
     fi
 
     echo "Requested migration of $DBNAME to version $VERSION, processing..."
-    docker-compose run --rm -e MARABUNTA_FORCE_VERSION=$VERSION -e DB_NAME=$DBNAME odoo migrate
+    $DCR -e MARABUNTA_FORCE_VERSION=$VERSION -e DB_NAME=$DBNAME odoo migrate
 }
 
 # Run a desired action
