@@ -16,6 +16,8 @@ do
     case $key in
         -d|--dbname)
             DBNAME="$2"; shift; shift ;;
+        --force)
+            FORCE=1; shift; shift ;;
         -p|--port)
             PORT="$2"; shift; shift ;;
         -q|--quiet)
