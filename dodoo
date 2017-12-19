@@ -1,11 +1,6 @@
 #!/usr/bin/env bash
 POSITIONAL=()
 
-# Define subcommands
-up() {
-    docker-compose run --rm -e DB_NAME="$DBNAME" -p "$PORT":8069 odoo odoo --workers=0 ${LOG_HANDLER:-} ${POSITIONAL:-}
-}
-
 # Parse input
 SUBCOMMAND="$1"
 shift
@@ -48,6 +43,11 @@ DBNAME=${DBNAME:-'odoodb'}
 if [ ! -z "$LOG_HANDLER" ]; then
     LOG_HANDLER="--log-handler=$LOG_HANDLER"
 fi
+
+# Define subcommands
+up() {
+    docker-compose run --rm -e DB_NAME="$DBNAME" -p "$PORT":8069 odoo odoo --workers=0 ${LOG_HANDLER:-} ${POSITIONAL:-}
+}
 
 # Run a desired action
 case $SUBCOMMAND in
