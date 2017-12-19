@@ -22,6 +22,8 @@ do
                 LOG_HANDLER="werkzeug:WARNING"
             fi
             shift ;;
+        -v|--version)
+            VERSION="$2"; shift; shift ;;
         *)
             POSITIONAL+=("$1"); shift ;;
     esac
@@ -37,6 +39,33 @@ fi
 # Define subcommands
 up() {
     docker-compose run --rm -e DB_NAME="$DBNAME" -p "$PORT":8069 odoo odoo --workers=0 ${LOG_HANDLER:-} ${POSITIONAL:-}
+}
+
+migrate() {
+    CODE=0
+    if [ -z "$DBNAME" ]; then
+        echo 'ERROR: No database name given.'
+        CODE=1
+    fi
+    if [ -z "$VERSION" ]; then
+        echo 'ERROR: No project version specified.'
+        CODE=1
+    fi
+
+    # experimental
+    if [ "$VERSION" = "latest" ]; then
+        VERSION=$(cat "$(git rev-parse --show-toplevel)/odoo/VERSION")
+    fi
+
+    if [ ! "$CODE" -eq 0 ]; then
+        echo
+        echo "Usage:   dcmig database_name x.y.z"
+        echo "Example: dcmig odoodb 1.2.3"
+        return $CODE
+    fi
+
+    echo "Requested migration of $DBNAME to version $VERSION, processing..."
+    docker-compose run --rm -e MARABUNTA_FORCE_VERSION=$VERSION -e DB_NAME=$DBNAME odoo migrate
 }
 
 # Run a desired action
