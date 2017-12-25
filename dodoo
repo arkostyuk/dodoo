@@ -43,7 +43,7 @@ fi
 
 # Define subcommands
 up() {
-    $DCR -e DB_NAME="$DBNAME" -p "$PORT":8069 odoo odoo --workers=0 ${LOG_HANDLER:-} ${POSITIONAL:-}
+    $DCR -e DB_NAME="$DBNAME" -p "$PORT":8069 odoo odoo --workers=0 ${LOG_HANDLER:-} ${POSITIONAL[@]:-}
 }
 
 migrate() {
