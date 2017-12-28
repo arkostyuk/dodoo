@@ -76,6 +76,21 @@ migrate() {
     $DCR -e MARABUNTA_FORCE_VERSION=$VERSION -e DB_NAME=$DBNAME odoo migrate
 }
 
+scratch() {
+    OVERRIDE_DB=${DBNAME:-''}
+    setup_defaults
+    if [ ! -z "$OVERRIDE_DB" ]; then
+        DBNAME=$OVERRIDE_DB
+    else
+        DBNAME='testdb'
+    fi
+    MODULES_TO_INSTALL=''
+    for i in $POSITIONAL; do
+        MODULES_TO_INSTALL="$MODULES_TO_INSTALL -i $i"
+    done
+    $DCR -e DB_NAME=${DBNAME:='testdb'} odoo testdb-gen -i base $MODULES_TO_INSTALL
+}
+
 dropdb() {
     if [[ "$DBNAME" == "odoodb" && ! $FORCE -eq 1  ]]; then
         echo 'Refusing to drop odoodb; you must call dodoo with --force to do so.'
