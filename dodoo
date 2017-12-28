@@ -161,7 +161,9 @@ dropdb() {
         exit 1
     fi
     dodoo_execute "$DCR odoo dropdb $DBNAME"
-    echo "$SELF: $DBNAME seems to be dropped now."
+    if [ $? -eq 0 ]; then
+        echo "$SELF: $DBNAME seems to be dropped now."
+    fi
 }
 
 shell() {
