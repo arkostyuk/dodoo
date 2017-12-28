@@ -42,7 +42,7 @@ if [ ! -z "$LOG_HANDLER" ]; then
 fi
 
 # Define subcommands
-up() {
+run() {
     $DCR -e DB_NAME="$DBNAME" -p "$PORT":8069 odoo odoo --workers=0 ${LOG_HANDLER:-} ${POSITIONAL[@]:-}
 }
 
@@ -82,7 +82,7 @@ dropdb() {
 }
 
 # Run a desired action
-if [[ $SUBCOMMAND =~ ^(up|migrate|dropdb)$ ]]; then
+if [[ $SUBCOMMAND =~ ^(run|migrate|dropdb)$ ]]; then
     $SUBCOMMAND
     exit 0
 else
