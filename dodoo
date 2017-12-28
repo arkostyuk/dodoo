@@ -113,6 +113,37 @@ scratch() {
     $DCR -e DB_NAME=${DBNAME:='testdb'} odoo testdb-gen -i base $MODULES_TO_INSTALL
 }
 
+probe() {
+    setup_defaults
+    echo "Probing database $DBNAME for $# module(s)..."
+    MODULES_TO_PROBE="'$1'"
+    shift
+    while [ $# -gt 0 ]; do
+        MODULES_TO_PROBE="$MODULES_TO_PROBE, '$1'"
+        shift
+    done
+    MODULES_TO_PROBE="($MODULES_TO_PROBE)"
+    $DCR odoo psql -c "select id, name, state from ir_module_module where name in $MODULES_TO_PROBE"
+}
+
+install() {
+    setup_defaults
+    MODULES_TO_INSTALL=''
+    for i in $POSITIONAL; do
+        MODULES_TO_INSTALL="$MODULES_TO_INSTALL -i $i"
+    done
+    $DCR -e DB_NAME=${DBNAME:='testdb'} -e MIGRATE=False odoo odoo --stop-after-init $MODULES_TO_INSTALL
+}
+
+upgrade() {
+    setup_defaults
+    MODULES_TO_UPGRADE=''
+    for i in $POSITIONAL; do
+        MODULES_TO_UPGRADE="$MODULES_TO_UPGRADE -u $i"
+    done
+    $DCR -e DB_NAME=${DBNAME:='testdb'} -e MIGRATE=False odoo odoo --stop-after-init $MODULES_TO_UPGRADE
+}
+
 dropdb() {
     setup_defaults
     if [[ "$DBNAME" == "odoodb" && ! $FORCE -eq 1  ]]; then
@@ -123,7 +154,7 @@ dropdb() {
 }
 
 # Run a desired action
-if [[ $SUBCOMMAND =~ ^(run|migrate|dropdb)$ ]]; then
+if [[ $SUBCOMMAND =~ ^(run|migrate|dropdb|probe|install|upgrade)$ ]]; then
     $SUBCOMMAND
     exit 0
 else
