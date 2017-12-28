@@ -7,8 +7,6 @@ DCR='docker-compose run --rm'
 # Parse input
 SUBCOMMAND="$1"; shift
 
-# LOG_HANDLER=""
-
 while [ $# -gt 0 ]
 do
     key="$1"
