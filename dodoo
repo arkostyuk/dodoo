@@ -71,7 +71,7 @@ setup_defaults() {
 # Define subcommands
 run() {
     setup_defaults
-    $DCR -e DB_NAME="$DBNAME" ${NOMIGRATE:-} -p "$PORT":8069 odoo odoo --workers=0 ${LOG_HANDLER:-} ${POSITIONAL[@]:-}
+    $DCR -e DB_NAME="$DBNAME" ${NOMIGRATE:-} -p "$PORT":8069 odoo odoo --workers=0 ${LOG_HANDLER:-} $@
 }
 
 migrate() {
@@ -109,9 +109,11 @@ scratch() {
     else
         DBNAME='testdb'
     fi
-    MODULES_TO_INSTALL=''
-    for i in $POSITIONAL; do
-        MODULES_TO_INSTALL="$MODULES_TO_INSTALL -i $i"
+    MODULES_TO_INSTALL="-i $1"
+    shift
+    while [ $# -gt 0 ]; do
+        MODULES_TO_INSTALL="$MODULES_TO_INSTALL -i $1"
+        shift
     done
     $DCR -e DB_NAME=${DBNAME:='testdb'} odoo testdb-gen -i base $MODULES_TO_INSTALL
 }
@@ -198,7 +200,7 @@ pytest() {
         echo "Refusing to run tests on odoodb; please provide test database name or use --force."
         exit 1
     fi
-    # POSITIONAL contain test suites now
+    # Positionals contain test suites now
     TESTSUITES="$TESTING_RANGE$1"
     shift
     while [ $# -gt 0 ]; do
@@ -211,7 +213,7 @@ pytest() {
 
 runtests() {
     setup_defaults
-    $DCR -e DB_NAME=$DBNAME odoo runtests {$POSITIONAL[@]:-}
+    $DCR -e DB_NAME=$DBNAME odoo runtests $@
 }
 
 # Run a desired action
