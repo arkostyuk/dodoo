@@ -75,15 +75,8 @@ run() {
 }
 
 migrate() {
-    setup_defaults
-    if [ -z "$DBNAME" ]; then
-        echo "$SELF: ERROR: No database name given."
-        CODE=1
-    fi
-    if [ -z "$VERSION" ]; then
-        echo "$SELF: ERROR: No project version specified."
-        CODE=1
-    fi
+    DBNAME=$1
+    VERSION=$2
 
     if [ "$VERSION" = "latest" ]; then
         VERSION=$(echo $(egrep '^\s+- version:' "$(git rev-parse --show-toplevel)/odoo/migration.yml" | tail -n 1) | cut -d' ' -f3)
