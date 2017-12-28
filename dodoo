@@ -196,7 +196,7 @@ pytest() {
         # else: provide full paths
     esac
 
-    # -d odoodb is provided explicitly
+    # resolve a database to run tests onto
     DBNAME=${DBNAME:='testdb'}
     if [[ "$DBNAME" == "odoodb" && ! "$FORCE" -eq 1 ]]; then
         echo "Refusing to run tests on odoodb; please provide test database name or use --force."
