@@ -85,7 +85,6 @@ migrate() {
         CODE=1
     fi
 
-    # experimental
     if [ "$VERSION" = "latest" ]; then
         VERSION=$(echo $(egrep '^\s+- version:' "$(git rev-parse --show-toplevel)/odoo/migration.yml" | tail -n 1) | cut -d' ' -f3)
     fi
