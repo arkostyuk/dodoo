@@ -36,19 +36,23 @@ do
 done
 
 # Initialize defaults
-PORT=${PORT:-'80'}
-DBNAME=${DBNAME:-'odoodb'}
-if [ ! -z "$LOG_HANDLER" ]; then
-    LOG_HANDLER="--log-handler=$LOG_HANDLER"
-fi
+setup_defaults() {
+    CODE=0
+    PORT=${PORT:-'80'}
+    DBNAME=${DBNAME:-'odoodb'}
+    if [ ! -z "$LOG_HANDLER" ]; then
+        LOG_HANDLER="--log-handler=$LOG_HANDLER"
+    fi
+}
 
 # Define subcommands
 run() {
+    setup_defaults
     $DCR -e DB_NAME="$DBNAME" ${NOMIGRATE:-} -p "$PORT":8069 odoo odoo --workers=0 ${LOG_HANDLER:-} ${POSITIONAL[@]:-}
 }
 
 migrate() {
-    CODE=0
+    setup_defaults
     if [ -z "$DBNAME" ]; then
         echo 'ERROR: No database name given.'
         CODE=1
@@ -90,6 +94,7 @@ scratch() {
 }
 
 dropdb() {
+    setup_defaults
     if [[ "$DBNAME" == "odoodb" && ! $FORCE -eq 1  ]]; then
         echo 'Refusing to drop odoodb; you must call dodoo with --force to do so.'
         exit 1
