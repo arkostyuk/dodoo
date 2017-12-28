@@ -109,7 +109,7 @@ scratch() {
        MODULES_TO_INSTALL="-i $1"
        shift
        while [ $# -gt 0 ]; do
-           MODULES_TO_INSTALL="$MODULES_TO_INSTALL -i $1"
+           MODULES_TO_INSTALL="$MODULES_TO_INSTALL-i $1 "
            shift
        done
     fi
@@ -138,7 +138,7 @@ install() {
     setup_defaults
     MODULES_TO_INSTALL=''
     for i in $POSITIONAL; do
-        MODULES_TO_INSTALL="$MODULES_TO_INSTALL -i $i"
+        MODULES_TO_INSTALL="$MODULES_TO_INSTALL-i $i "
     done
     dodoo_execute "$DCR -e DB_NAME=${DBNAME:='testdb'} -e MIGRATE=False odoo odoo --stop-after-init $MODULES_TO_INSTALL"
 }
@@ -147,7 +147,7 @@ upgrade() {
     setup_defaults
     MODULES_TO_UPGRADE=''
     for i in $POSITIONAL; do
-        MODULES_TO_UPGRADE="$MODULES_TO_UPGRADE -u $i"
+        MODULES_TO_UPGRADE="$MODULES_TO_UPGRADE-u $i "
     done
     dodoo_execute "$DCR -e DB_NAME=${DBNAME:='testdb'} -e MIGRATE=False odoo odoo --stop-after-init $MODULES_TO_UPGRADE"
 }
