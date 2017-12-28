@@ -159,7 +159,7 @@ dropdb() {
 
 # Run a desired action
 if [[ $SUBCOMMAND =~ ^(run|migrate|dropdb|probe|install|upgrade)$ ]]; then
-    $SUBCOMMAND
+    $SUBCOMMAND ${POSITIONAL[@]}
     exit 0
 else
     echo "$SELF: $SUBCOMMAND is not a valid subcommand."
