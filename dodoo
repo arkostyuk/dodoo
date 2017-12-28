@@ -117,6 +117,11 @@ scratch() {
 }
 
 probe() {
+    if [ $# -eq 0 ]; then
+        echo "$SELF: No module names provided, providing common feedback."
+        $DCR odoo psql -c 'select state, count(state) from ir_module_module group by state'
+        exit 0
+    fi
     setup_defaults
     echo "Probing database $DBNAME for $# module(s)..."
     MODULES_TO_PROBE="'$1'"
