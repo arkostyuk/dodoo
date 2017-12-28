@@ -157,6 +157,58 @@ dropdb() {
     echo "$SELF: $DBNAME seems to be dropped now."
 }
 
+shell() {
+    setup_defaults
+    $DCR -e DB_NAME=$DBNAME -e MIGRATE=False odoo odoo shell --shell-interface=ipython
+}
+
+psql() {
+    setup_defaults
+    $DCR -e DB_NAME=$DBNAME odoo psql
+}
+
+dblist() {
+    $DCR odoo psql -c '\l'
+}
+
+pytest() {
+    # Where do we run?
+    case $1 in
+        # optionally prepend all suites with those base paths
+        -e|--ex|--external)
+            TESTING_RANGE='odoo/external-src/'
+            shift ;;
+        -l|--lo|--local)
+            TESTING_RANGE='odoo/local-src/'
+            shift ;;
+        -b|--ba|--base)
+            TESTING_RANGE='odoo/src/'
+            shift ;;
+        # else: provide full paths
+    esac
+
+    # -d odoodb is provided explicitly
+    DBNAME=${DBNAME:='testdb'}
+    if [[ "$DBNAME" == "odoodb" && ! "$FORCE" -eq 1 ]]; then
+        echo "Refusing to run tests on odoodb; please provide test database name or use --force."
+        exit 1
+    fi
+    # POSITIONAL contain test suites now
+    TESTSUITES="$TESTING_RANGE$1"
+    shift
+    while [ $# -gt 0 ]; do
+        TESTSUITES="$TESTSUITES $TESTING_RANGE$1"
+        shift
+    done
+    echo "Testing $TESTSUITES..."
+    $DCR -e DB_NAME=$DBNAME odoo pytest -s ${TESTSUITES:-}
+}
+
+runtests() {
+    setup_defaults
+    $DCR -e DB_NAME=$DBNAME odoo runtests {$POSITIONAL[@]:-}
+}
+
 # Run a desired action
 $SUBCOMMAND ${POSITIONAL[@]}
 CODE=$?
