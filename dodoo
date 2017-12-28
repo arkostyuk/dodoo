@@ -105,14 +105,10 @@ scratch() {
     else
         DBNAME='testdb'
     fi
-    if [ $# -gt 0 ]; then
-       MODULES_TO_INSTALL="-i $1"
-       shift
-       while [ $# -gt 0 ]; do
-           MODULES_TO_INSTALL="$MODULES_TO_INSTALL-i $1 "
-           shift
-       done
-    fi
+    while [ $# -gt 0 ]; do
+        MODULES_TO_INSTALL="$MODULES_TO_INSTALL-i $1 "
+        shift
+    done
     dodoo_execute "$DCR -e DB_NAME=${DBNAME:='testdb'} odoo testdb-gen -i base $MODULES_TO_INSTALL"
 }
 
