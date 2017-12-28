@@ -169,7 +169,7 @@ psql() {
 }
 
 dblist() {
-    dodoo_execute "$DCR odoo psql -c '\l'"
+    dodoo_execute "$DCR odoo psql -c \l"
 }
 
 pytest() {
