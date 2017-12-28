@@ -200,6 +200,17 @@ pytest() {
         echo "Refusing to run tests on odoodb; please provide test database name or use --force."
         exit 1
     fi
+
+    if [ $1 == '--recreate' ]; then
+        shift
+        dropdb
+        TO_INSTALL=''
+        for MODNAME in $@; do
+            TO_INSTALL="$TO_INSTALL $(basename $MODNAME)"
+        done
+        scratch $TO_INSTALL
+    fi
+
     # Positionals contain test suites now
     TESTSUITES="$TESTING_RANGE$1"
     shift
