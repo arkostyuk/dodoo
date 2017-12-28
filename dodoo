@@ -18,6 +18,9 @@ do
             DBNAME="$2"; shift; shift ;;
         --force)
             FORCE=1; shift; shift ;;
+        --nomig)
+            NOMIGRATE="-e MIGRATE=False"
+            shift ;;
         -p|--port)
             PORT="$2"; shift; shift ;;
         -q|--quiet)
@@ -43,7 +46,7 @@ fi
 
 # Define subcommands
 run() {
-    $DCR -e DB_NAME="$DBNAME" -p "$PORT":8069 odoo odoo --workers=0 ${LOG_HANDLER:-} ${POSITIONAL[@]:-}
+    $DCR -e DB_NAME="$DBNAME" ${NOMIGRATE:-} -p "$PORT":8069 odoo odoo --workers=0 ${LOG_HANDLER:-} ${POSITIONAL[@]:-}
 }
 
 migrate() {
