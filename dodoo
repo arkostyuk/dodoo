@@ -69,8 +69,8 @@ migrate() {
 
     if [ ! "$CODE" -eq 0 ]; then
         echo
-        echo "Usage:   dcmig database_name x.y.z"
-        echo "Example: dcmig odoodb 1.2.3"
+        echo "Usage:   $(basename $0) database_name x.y.z"
+        echo "Example: $(basename $0) odoodb 1.2.3"
         return $CODE
     fi
 
