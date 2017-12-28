@@ -133,8 +133,9 @@ probe() {
 install() {
     setup_defaults
     MODULES_TO_INSTALL=''
-    for i in $POSITIONAL; do
-        MODULES_TO_INSTALL="$MODULES_TO_INSTALL-i $i "
+    while [ $# -gt 0 ]; do
+        MODULES_TO_INSTALL="$MODULES_TO_INSTALL-i $1 "
+        shift
     done
     dodoo_execute "$DCR -e DB_NAME=${DBNAME:='testdb'} -e MIGRATE=False odoo odoo --stop-after-init $MODULES_TO_INSTALL"
 }
@@ -142,8 +143,9 @@ install() {
 upgrade() {
     setup_defaults
     MODULES_TO_UPGRADE=''
-    for i in $POSITIONAL; do
-        MODULES_TO_UPGRADE="$MODULES_TO_UPGRADE-u $i "
+    while [ $# -gt 0 ]; do
+        MODULES_TO_UPGRADE="$MODULES_TO_UPGRADE-u $1 "
+        shift
     done
     dodoo_execute "$DCR -e DB_NAME=${DBNAME:='testdb'} -e MIGRATE=False odoo odoo --stop-after-init $MODULES_TO_UPGRADE"
 }
