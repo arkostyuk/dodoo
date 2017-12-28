@@ -77,11 +77,11 @@ run() {
 migrate() {
     setup_defaults
     if [ -z "$DBNAME" ]; then
-        echo 'ERROR: No database name given.'
+        echo "$SELF: ERROR: No database name given."
         CODE=1
     fi
     if [ -z "$VERSION" ]; then
-        echo 'ERROR: No project version specified.'
+        echo "$SELF: ERROR: No project version specified."
         CODE=1
     fi
 
@@ -97,7 +97,7 @@ migrate() {
         return $CODE
     fi
 
-    echo "Requested migration of $DBNAME to version $VERSION, processing..."
+    echo "$SELF: Requested migration of $DBNAME to version $VERSION, processing..."
     dodoo_execute "$DCR -e MARABUNTA_FORCE_VERSION=$VERSION -e DB_NAME=$DBNAME odoo migrate"
 }
 
@@ -125,7 +125,7 @@ probe() {
         exit 0
     fi
     setup_defaults
-    echo "Probing database $DBNAME for $# module(s)..."
+    echo "$SELF: Probing database $DBNAME for $# module(s)..."
     MODULES_TO_PROBE="'$1'"
     shift
     while [ $# -gt 0 ]; do
@@ -157,7 +157,7 @@ upgrade() {
 dropdb() {
     setup_defaults
     if [[ "$DBNAME" == "odoodb" && ! $FORCE -eq 1  ]]; then
-        echo 'Refusing to drop odoodb; you must call dodoo with --force to do so.'
+        echo "$SELF: Refusing to drop odoodb; you must call dodoo with --force to do so."
         exit 1
     fi
     dodoo_execute "$DCR odoo dropdb $DBNAME"
@@ -199,7 +199,7 @@ pytest() {
     # resolve a database to run tests onto
     DBNAME=${DBNAME:='testdb'}
     if [[ "$DBNAME" == "odoodb" && ! "$FORCE" -eq 1 ]]; then
-        echo "Refusing to run tests on odoodb; please provide test database name or use --force."
+        echo "$SELF: Refusing to run tests on odoodb; please provide test database name or use --force."
         exit 1
     fi
 
@@ -220,7 +220,7 @@ pytest() {
         TESTSUITES="$TESTSUITES $TESTING_RANGE$1"
         shift
     done
-    echo "Testing $TESTSUITES..."
+    echo "$SELF: Testing $TESTSUITES..."
     dodoo_execute "$DCR -e DB_NAME=$DBNAME odoo pytest -s ${TESTSUITES:-}"
 }
 
@@ -244,6 +244,7 @@ fi
 $SUBCOMMAND ${POSITIONAL[@]}
 CODE=$?
 if [ $CODE -ne 0 ]; then
+    echo -e "\e[36m\e[1m:: Usage:\e[0m"
     echo "Working on it :D"
     exit $CODE
 fi
