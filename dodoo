@@ -150,7 +150,8 @@ dropdb() {
         echo 'Refusing to drop odoodb; you must call dodoo with --force to do so.'
         exit 1
     fi
-    $DCR odoo odoo dropdb $DBNAME
+    $DCR odoo dropdb $DBNAME
+    echo "dodoo: $DBNAME seems to be dropped now."
 }
 
 # Run a desired action
