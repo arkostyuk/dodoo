@@ -4,6 +4,9 @@ POSITIONAL=()
 # Used way too often
 DCR='docker-compose run --rm'
 
+# Basename
+SELF="$(basename $0)"
+
 # Parse input
 SUBCOMMAND="$1"; shift
 
@@ -89,8 +92,8 @@ migrate() {
 
     if [ ! "$CODE" -eq 0 ]; then
         echo
-        echo "Usage:   $(basename $0) database_name x.y.z"
-        echo "Example: $(basename $0) odoodb 1.2.3"
+        echo "Usage:   $SELF database_name x.y.z"
+        echo "Example: $SELF odoodb 1.2.3"
         return $CODE
     fi
 
@@ -151,7 +154,7 @@ dropdb() {
         exit 1
     fi
     $DCR odoo dropdb $DBNAME
-    echo "dodoo: $DBNAME seems to be dropped now."
+    echo "$SELF: $DBNAME seems to be dropped now."
 }
 
 # Run a desired action
@@ -159,6 +162,6 @@ if [[ $SUBCOMMAND =~ ^(run|migrate|dropdb|probe|install|upgrade)$ ]]; then
     $SUBCOMMAND
     exit 0
 else
-    echo "dodoo: $SUBCOMMAND is not a valid subcommand."
+    echo "$SELF: $SUBCOMMAND is not a valid subcommand."
     exit 1
 fi
