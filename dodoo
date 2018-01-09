@@ -195,6 +195,9 @@ pytest() {
         -b|--ba|--base)
             TESTING_RANGE='odoo/src/'
             shift ;;
+        -s|--smart)
+            SMART=1
+            shift ;;
         # else: provide full paths
     esac
 
@@ -208,7 +211,12 @@ pytest() {
     # Positionals contain test suites now
     TESTSUITES=''
     while [ $# -gt 0 ]; do
-        TESTSUITES="$TESTSUITES $TESTING_RANGE$1"
+        if [ $SMART -eq 1 ]; then
+            MODULE="$(find odoo -name $1)"
+        else
+            MODULE="$TESTING_RANGE$1"
+        fi
+        TESTSUITES="$TESTSUITES $MODULE"
         shift
     done
 
