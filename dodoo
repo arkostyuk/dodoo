@@ -206,8 +206,7 @@ pytest() {
     fi
 
     # Positionals contain test suites now
-    TESTSUITES="$TESTING_RANGE$1"
-    shift
+    TESTSUITES=''
     while [ $# -gt 0 ]; do
         TESTSUITES="$TESTSUITES $TESTING_RANGE$1"
         shift
