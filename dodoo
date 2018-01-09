@@ -177,6 +177,12 @@ dblist() {
 }
 
 pytest() {
+    RECREATE=0
+    if [ $1 == '--recreate' ]; then
+        RECREATE=1
+        shift
+    fi
+
     # Where do we run?
     case $1 in
         # optionally prepend all suites with those base paths
@@ -199,16 +205,6 @@ pytest() {
         exit 1
     fi
 
-    if [ $1 == '--recreate' ]; then
-        shift
-        dropdb
-        TO_INSTALL=''
-        for MODNAME in $@; do
-            TO_INSTALL="$TO_INSTALL $(basename $MODNAME)"
-        done
-        scratch $TO_INSTALL
-    fi
-
     # Positionals contain test suites now
     TESTSUITES="$TESTING_RANGE$1"
     shift
@@ -216,6 +212,17 @@ pytest() {
         TESTSUITES="$TESTSUITES $TESTING_RANGE$1"
         shift
     done
+
+    if [ $RECREATE -eq 1 ]; then
+        shift
+        dropdb
+        TO_INSTALL=''
+        for MODNAME in $TESTSUITES; do
+            TO_INSTALL="$TO_INSTALL $(basename $MODNAME)"
+        done
+        scratch $TO_INSTALL
+    fi
+
     echo "$SELF: Testing $TESTSUITES..."
     dodoo_execute "$DCR -e DB_NAME=$DBNAME odoo pytest -s ${TESTSUITES:-}"
 }
