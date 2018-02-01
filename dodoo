@@ -6,6 +6,17 @@ DCR='docker-compose run --rm'
 
 # Basename
 SELF="$(basename $0)"
+GIT_ROOT="$(git rev-parse --show-toplevel)"
+
+# Running context
+GIT_CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+if [[ "$GIT_CURRENT_BRANCH" == "HEAD" ]]; then
+    GIT_CURRENT_BRANCH='scratch'
+else
+    if [[ "$GIT_CURRENT_BRANCH" == "master" ]]; then
+        GIT_CURRENT_BRANCH='odoodb'
+    fi
+fi
 
 # Parse input
 SUBCOMMAND="$1"; shift
@@ -26,6 +37,9 @@ do
         --scratch)
             NOMIGRATE="-e MIGRATE=False"
             DBNAME='scratch'
+            shift ;;
+        --curr)
+            DBNAME="$GIT_CURRENT_BRANCH"
             shift ;;
 
         # Custom name fallback
@@ -65,7 +79,7 @@ done
 setup_defaults() {
     CODE=0
     PORT=${PORT:-'80'}
-    DBNAME=${DBNAME:-'odoodb'}
+    : ${DBNAME:=$GIT_CURRENT_BRANCH}
     if [ ! -z "$LOG_HANDLER" ]; then
         LOG_HANDLER="--log-handler=$LOG_HANDLER"
     fi
