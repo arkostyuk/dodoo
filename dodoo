@@ -31,11 +31,9 @@ do
             DBNAME='odoodb'
             shift ;;
         --test)
-            NOMIGRATE="-e MIGRATE=False"
             DBNAME='testdb'
             shift ;;
         --scratch)
-            NOMIGRATE="-e MIGRATE=False"
             DBNAME='scratch'
             shift ;;
         --curr)
@@ -52,7 +50,7 @@ do
             shift ;;
         --force)
             FORCE=1
-            shift 2 ;;
+            shift ;;
         --nomig)
             NOMIGRATE="-e MIGRATE=False"
             shift ;;
@@ -78,12 +76,15 @@ done
 # Initialize defaults
 setup_defaults() {
     CODE=0
-    PORT=${PORT:-'80'}
+    : ${PORT:='80'}
     : ${DBNAME:=$GIT_CURRENT_BRANCH}
+    # : ${NOMIGRATE:=0}
+    if [[ 'scratch test' =~ "$DBNAME" ]]; then
+        NOMIGRATE="-e MIGRATE=False"
+    fi
     if [ ! -z "$LOG_HANDLER" ]; then
         LOG_HANDLER="--log-handler=$LOG_HANDLER"
     fi
-    DRYRUN=${DRYRUN:=0}
 }
 
 # Define subcommands
@@ -93,11 +94,15 @@ run() {
 }
 
 migrate() {
-    DBNAME=$1
-    VERSION=$2
+    if [[ -z "$DBNAME" ]]; then
+        DBNAME=$1
+        shift
+    fi
+    VERSION=$1
+    CODE=0
 
     if [ "$VERSION" = "latest" ]; then
-        VERSION=$(echo $(egrep '^\s+- version:' "$(git rev-parse --show-toplevel)/odoo/migration.yml" | tail -n 1) | cut -d' ' -f3)
+        VERSION=$(echo $(egrep '^\s+- version:' "$GIT_ROOT/odoo/migration.yml" | tail -n 1) | cut -d' ' -f3)
     fi
 
     if [ ! "$CODE" -eq 0 ]; then
@@ -107,6 +112,10 @@ migrate() {
         return $CODE
     fi
 
+    if [[ -z "$DBNAME" || -z "$VERSION" ]]; then
+        echo Nope.
+        exit 1
+    fi
     echo "$SELF: Requested migration of $DBNAME to version $VERSION, processing..."
     dodoo_execute "$DCR -e MARABUNTA_FORCE_VERSION=$VERSION -e DB_NAME=$DBNAME odoo migrate"
 }
@@ -117,19 +126,20 @@ scratch() {
     if [ ! -z "$OVERRIDE_DB" ]; then
         DBNAME=$OVERRIDE_DB
     else
-        DBNAME='testdb'
+        DBNAME='scratch'
     fi
     while [ $# -gt 0 ]; do
-        MODULES_TO_INSTALL="$MODULES_TO_INSTALL-i $1 "
+        MODULES_TO_INSTALL="$MODULES_TO_INSTALL,$1"
         shift
     done
-    dodoo_execute "$DCR -e DB_NAME=${DBNAME:='testdb'} odoo testdb-gen -i base $MODULES_TO_INSTALL"
+    dodoo_execute "$DCR -e DB_NAME=${DBNAME:='testdb'} odoo testdb-gen -i base$MODULES_TO_INSTALL"
 }
 
 probe() {
     if [ $# -eq 0 ]; then
         echo "$SELF: No module names provided, providing common feedback."
-        dodoo_execute "$DCR odoo psql -c 'select state, count(state) from ir_module_module group by state'"
+        psql -c 'select state, count(state) from ir_module_module group by state'
+        # dodoo_execute "$DCR odoo psql --command='select state, count(state) from ir_module_module group by state'"
         exit 0
     fi
     setup_defaults
@@ -140,8 +150,8 @@ probe() {
         MODULES_TO_PROBE="$MODULES_TO_PROBE, '$1'"
         shift
     done
-    MODULES_TO_PROBE="($MODULES_TO_PROBE)"
-    dodoo_execute "$DCR odoo psql -c 'select id, name, state from ir_module_module where name in $MODULES_TO_PROBE'"
+    CCC="--command='select id, name, state from ir_module_module where name in ($MODULES_TO_PROBE)"
+    dodoo_execute "$DCR odoo psql $DBNAME odoo" $CCC
 }
 
 install() {
@@ -166,7 +176,10 @@ upgrade() {
 
 dropdb() {
     setup_defaults
-    if [[ "$DBNAME" == "odoodb" && ! $FORCE -eq 1  ]]; then
+    if [ ! -z "$1" ]; then
+        DBNAME=$1
+    fi
+    if [[ "$DBNAME" == "odoodb" && ! $FORCE -eq 1 ]]; then
         echo "$SELF: Refusing to drop odoodb; you must call dodoo with --force to do so."
         exit 1
     fi
@@ -183,15 +196,14 @@ shell() {
 
 psql() {
     setup_defaults
-    dodoo_execute "$DCR -e DB_NAME=$DBNAME odoo psql"
+    dodoo_execute "$DCR odoo psql $DBNAME odoo $@"
 }
 
 dblist() {
-    dodoo_execute "$DCR odoo psql -c \l"
+    psql -l
 }
 
 pytest() {
-    RECREATE=0
     if [ $1 == '--recreate' ]; then
         RECREATE=1
         shift
@@ -217,7 +229,7 @@ pytest() {
 
     # resolve a database to run tests onto
     DBNAME=${DBNAME:='testdb'}
-    if [[ "$DBNAME" == "odoodb" && ! "$FORCE" -eq 1 ]]; then
+    if [[ "$DBNAME" == "odoodb" && -z "$FORCE" ]]; then
         echo "$SELF: Refusing to run tests on odoodb; please provide test database name or use --force."
         exit 1
     fi
@@ -225,27 +237,42 @@ pytest() {
     # Positionals contain test suites now
     TESTSUITES=''
     while [ $# -gt 0 ]; do
-        if [ $SMART -eq 1 ]; then
-            MODULE="$(find odoo -name $1)"
+        if [ ! -z "$SMART" ]; then
+            MODULE="$(find odoo -name $1 ! -wholename '*/setup/*')"
+            if [[ -z "$MODULE" ]]; then
+                echo "$SELF: Nothing to test, sry m8 :("
+                exit 1
+            fi
         else
             MODULE="$TESTING_RANGE$1"
         fi
-        TESTSUITES="$TESTSUITES $MODULE"
+        TESTSUITES="$TESTSUITES$MODULE "
         shift
     done
 
-    if [ $RECREATE -eq 1 ]; then
+    if [ ! -z "$RECREATE" ]; then
         shift
-        dropdb
         TO_INSTALL=''
         for MODNAME in $TESTSUITES; do
             TO_INSTALL="$TO_INSTALL $(basename $MODNAME)"
         done
-        scratch $TO_INSTALL
+
+        if [[ -z "$TESTSUITES" ]]; then
+            echo "$SELF: Nothing to reinstall, abort."
+            exit 1
+        fi
+
+        dropdb
+        scratch --test $TO_INSTALL
     fi
 
     echo "$SELF: Testing $TESTSUITES..."
     dodoo_execute "$DCR -e DB_NAME=$DBNAME odoo pytest -s ${TESTSUITES:-}"
+}
+
+sing() {
+    setup_defaults
+    dodoo_execute "$DCR -e DB_NAME=$DBNAME odoo anthem $@"
 }
 
 runtests() {
@@ -254,14 +281,24 @@ runtests() {
 }
 
 dodoo_execute() {
-    if [ ! -z "$1" ]; then
-        if [[ $DRYRUN -eq 0 ]]; then
-            echo -e "\e[36m\e[1m:: $SELF: EXECUTING\e[39m $1\e[0m"
-            $1
+    if [[ ! -z $# ]]; then
+        if [[ -z "$DRYRUN" ]]; then
+            echo -e "\e[36m\e[1m:: $SELF: EXECUTING\e[39m $@\e[0m"
+            $@
         else
-            echo -e "\e[36m\e[1m:: $SELF: WOULD EXECUTE\e[39m $1\e[0m"
+            echo -e "\e[36m\e[1m:: $SELF: WOULD EXECUTE\e[39m $@\e[0m"
         fi
     fi
+}
+
+clone() {
+    : ${DBNAME:=$GIT_CURRENT_BRANCH}
+    dodoo_execute "$DCR odoo createdb -T odoodb $DBNAME $@"
+    if [[ "$?" -ne "0" ]]; then
+        exit $?
+    fi
+    dodoo_execute "$DCR odoo cp -rf /data/odoo/filestore/odoodb /data/odoo/filestore/$DBNAME"
+    migrate latest
 }
 
 # Run a desired action
