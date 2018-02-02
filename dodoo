@@ -263,7 +263,7 @@ pytest() {
         fi
 
         dropdb
-        scratch --test $TO_INSTALL
+        scratch $TO_INSTALL
     fi
 
     echo "$SELF: Testing $TESTSUITES..."
