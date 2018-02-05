@@ -183,11 +183,14 @@ def subcommand(f, *args, **kwargs):
     @wraps(f)
     def wrapper(*args, **kwargs):
         """Actually execute command."""
-        self_args, positionals, ctx = args
+        initial_args, pos, ctx = args
         service, servicecmd, runtime, env, subargs, rest = f(*args, **kwargs)
         runtime = squash(runtime, prefix='', argprefix='-', separator=' ')
+        env.update(ctx.get('override_env'))
         env = squash(env, prefix='-e', argprefix='', separator='=')
         subargs = squash(subargs, prefix='', argprefix='--', separator='=')
+        rest = ' '.join(rest)
+
         dcrm_prefix = 'docker-compose run --rm'
         dcrm_args = ' '.join(
             s for s in (runtime, env, service, servicecmd, subargs, rest) if s)
