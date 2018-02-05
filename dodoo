@@ -27,6 +27,7 @@ def parse_arguments():
 
     # Global arguments
     parser.add_argument('-d', '-db', '--dbname')
+    parser.add_argument('-n', '--dryrun', action='store_true')
 
     dbnames = parser.add_mutually_exclusive_group()
     dbnames.add_argument('--core', action='store_true')
@@ -63,10 +64,10 @@ def parse_arguments():
     parser_dropdb = subparsers.add_parser(
         'dropdb',
         help='get rid of a specified database')
-    parser_dropdb.add_argument('dbname')
 
     parser_dropdb.set_defaults(
         func=dropdb,
+        dbname=False,
     )
 
     # `FORK`
@@ -75,6 +76,15 @@ def parse_arguments():
         help='clone the core (odoodb) database, name it like current branch')
     parser_fork.set_defaults(
         func=fork,
+    )
+
+    # `TEST`
+    parser_test = subparsers.add_parser(
+        'test',
+        help='upgrade the given module while running tests on it',
+    )
+    parser_test.set_defaults(
+        func=test,
     )
 
     return parser.parse_known_args()
@@ -98,23 +108,37 @@ def resolve_context(args):
     }
 
     if args.core:
-        ctx['override_db'] = 'odoodb'
+        args.dbname = 'odoodb'
     elif args.scratch:
-        ctx['override_db'] = 'scratch'
+        args.dbname = 'scratch'
     elif args.test:
-        ctx['override_db'] = 'test'
+        args.dbname = 'testdb'
 
     return ctx
 
 
-def squash_args(args):
+def squash(args, prefix='', argprefix='-', separator='='):
     """Flatten a dictionary of arguments into a single string. """
-    return ' '.join('{}={}'.format(k, v) for k, v in args.items())
+    res = []
+    for k, v in args.items():
+        if v is None:
+            # pass a bare key w/out it's value for a long flags
+            # like --stop-after-init
+            res.append(str(k))
+        else:
+            cval = '{}{}{}{}'.format(argprefix, k, separator, v)
+            if prefix:
+                cval = prefix + ' ' + cval
+            res.append(cval)
+    return ' '.join(res)
 
 
-def dodoo_execute(cmd):
-    pprint('Executing {}'.format(cmd))
-    os.system(cmd)
+def dodoo_execute(cmd, args):
+    if not args.dryrun:
+        pprint('Executing {}'.format(cmd), log_decoration=' :: ')
+    else:
+        pprint('Would execute {}'.format(cmd), log_decoration=' -- ')
+    not args.dryrun and os.system(cmd)
 
 
 def subcommand(f, *args, **kwargs):
@@ -129,31 +153,41 @@ def subcommand(f, *args, **kwargs):
     @wraps(f)
     def wrapper(*args, **kwargs):
         """Actually execute command."""
-        service, env, subargs = f(*args, **kwargs)
-        env, subargs = map(squash_args, (env, subargs))
-        cmd = 'docker-compose run --rm {env} {service} {subargs}'.format(
-            env=env, service=service, subargs=subargs)
-        dodoo_execute(cmd)
-        # TODO make it pretty :D
+        self_args, positionals, ctx = args
+        service, servicecmd, runtime, env, subargs, rest = f(*args, **kwargs)
+        runtime = squash(runtime, prefix='', argprefix='-', separator=' ')
+        env = squash(env, prefix='-e', argprefix='', separator='=')
+        subargs = squash(subargs, prefix='', argprefix='--', separator='=')
+        dcrm_prefix = 'docker-compose run --rm'
+        dcrm_args = ' '.join(
+            s for s in (runtime, env, service, servicecmd, subargs, rest) if s)
+        cmd = dcrm_prefix + ' ' + dcrm_args
+        dodoo_execute(cmd, args[0])
     return wrapper
 
 
 @subcommand
 def run(args, pos, ctx):
-    service = 'odoo odoo'
+    service = 'odoo'
+    servicecmd = 'odoo'
+    runtime = {
+        'p': '{}:8069'.format(args.port),
+    }
     env = {
-        '-p': str(args.port) + ':8069',
     }
     subargs = {
-        '--log-handler': 'werkzeug:WARNING' if args.quiet else "''",
-        '--workers': 0,
+        'log-handler': 'werkzeug:WARNING' if args.quiet else "''",
+        'workers': 0,
     }
-    return service, env, subargs
+    rest = pos
+    return service, servicecmd, runtime, env, subargs, rest
 
 
 @subcommand
 def migrate(args, pos, ctx):
-    service = 'odoo migrate'
+    service = 'odoo'
+    servicecmd = 'migrate'
+    runtime = {}
     if args.version == 'latest':
         migration_file = os.path.join(
             ctx['repo'].workdir, 'odoo', 'migration.yml')
@@ -163,16 +197,25 @@ def migrate(args, pos, ctx):
                     args.version = line.split()[-1]
                     break
     env = {
-        '-e MARABUNTA_FORCE_VERSION': args.version,
-        '-e DB_NAME': args.dbname,
+        'MARABUNTA_FORCE_VERSION': args.version,
+        'DB_NAME': args.dbname,
     }
     subargs = {}
-    return service, env, subargs
+    rest = pos
+    return service, servicecmd, runtime, env, subargs, rest
 
 
 @subcommand
 def dropdb(args, pos, ctx):
-    pass
+    service = 'odoo'
+    servicecmd = 'dropdb'
+    runtime = {}
+    env = {
+        'DBNAME': ctx.get('override_db') or args.dbname
+    }
+    subargs = {}
+    rest = pos
+    return service, servicecmd, runtime, env, subargs, rest
 
 
 @subcommand
