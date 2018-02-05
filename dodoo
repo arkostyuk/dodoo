@@ -1,0 +1,180 @@
+#!/usr/bin/env python
+import argparse
+from pygit2 import Repository, discover_repository
+import os
+import sys
+from functools import wraps
+
+
+def pprint(msg, log_decoration=' :: '):
+    """Mostly borrowed from Marabunta :3"""
+    supports_colors = hasattr(sys.stdout, 'isatty') and sys.stdout.isatty()
+    if supports_colors:
+        template = u'\033[1m{}{}\033[0m'
+    else:
+        template = u'{}{}'
+    print(template.format(log_decoration, msg))
+
+
+def parse_arguments():
+    """Parses args from command line, decides what and how to run next.
+
+    The majority of dodoo structure is defined here.
+    """
+    parser = argparse.ArgumentParser(
+        description='An CLI porcelain to interact with '
+        'C2C dockerized Odoo architecture.')
+
+    # Global arguments
+    parser.add_argument('-d', '-db', '--dbname')
+
+    dbnames = parser.add_mutually_exclusive_group()
+    dbnames.add_argument('--core', action='store_true')
+    dbnames.add_argument('--curr', action='store_true')
+    dbnames.add_argument('--test', action='store_true')
+    dbnames.add_argument('--scratch', action='store_true')
+
+    # Subcommands
+    subparsers = parser.add_subparsers()
+
+    # `RUN`
+    parser_run = subparsers.add_parser(
+        'run',
+        help='start a one-off Odoo service')
+    parser_run.add_argument(
+        '-p', '--port', default=80, help='port to allocate')
+    parser_run.add_argument('-q', '--quiet', action='store_true')
+    parser_run.set_defaults(
+        func=run,
+        port=80,
+    )
+
+    # `MIGRATE`
+    parser_migrate = subparsers.add_parser(
+        'migrate',
+        help='migrate a specified database to the given version')
+    parser_migrate.add_argument('dbname')  # TODO really?
+    parser_migrate.add_argument('version')
+    parser_migrate.set_defaults(
+        func=migrate,
+        version='latest',
+    )
+
+    # `DROPDB`
+    parser_dropdb = subparsers.add_parser(
+        'dropdb',
+        help='get rid of a specified database')
+    parser_dropdb.add_argument('dbname')
+
+    parser_dropdb.set_defaults(
+        func=dropdb,
+    )
+
+    # `FORK`
+    parser_fork = subparsers.add_parser(
+        'fork',
+        help='clone the core (odoodb) database, name it like current branch')
+    parser_fork.set_defaults(
+        func=fork,
+    )
+
+    return parser.parse_known_args()
+
+
+def _default_dbname():
+    branch = resolve_context().get('repo').head.shorthand
+    print('Running on branch {}'.format(branch))
+    if branch == 'HEAD':  # detached head state
+        return 'scratch'
+    elif branch == 'master':  # core
+        return 'odoodb'
+    else:
+        return branch
+
+
+def resolve_context():
+    ctx = {
+        # TODO: drop extra dependency? this could be resolved by bare os.system
+        'repo': Repository(discover_repository(os.getcwd())),
+    }
+    return ctx
+
+
+def squash_args(args):
+    """Flatten a dictionary of arguments into a single string. """
+    return ' '.join('{}={}'.format(k, v) for k, v in args.items())
+
+
+def subcommand(f, *args, **kwargs):
+    """Defines a subcommand of a top-level sript.
+
+    Each of decorated methods should return a tuple in the given order:
+    `service` :str: a combination of service from `docker-compose.yml`
+    config (odoo|db) and a command to run in that service
+    `env` :dict: a dictionary of parameters that are passed to `docker-compose`
+    `subargs` :dict: same, but those are passed to subprocess
+    """
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        """Actually execute command."""
+        service, env, subargs = f(*args, **kwargs)
+        env, subargs = map(squash_args, (env, subargs))
+        cmd = 'docker-compose run --rm {env} {service} {subargs}'.format(
+            env=env, service=service, subargs=subargs)
+        # TODO make it pretty :D
+        pprint('Executing {}'.format(cmd))
+        os.system(cmd)
+    return wrapper
+
+
+@subcommand
+def run(args, pos, ctx):
+    service = 'odoo odoo'
+    env = {
+        '-p': str(args.port) + ':8069',
+    }
+    subargs = {
+        '--log-handler': 'werkzeug:WARNING' if args.quiet else "''",
+        '--workers': 0,
+    }
+    return service, env, subargs
+
+
+@subcommand
+def migrate(args, pos, ctx):
+    service = 'odoo migrate'
+    if args.version == 'latest':
+        migration_file = os.path.join(
+            ctx['repo'].workdir, 'odoo', 'migration.yml')
+        with open(migration_file, 'r') as migration_yml:
+            for line in reversed(list(migration_yml)):
+                if 'version:' in line:
+                    args.version = line.split()[-1]
+                    break
+    env = {
+        '-e MARABUNTA_FORCE_VERSION': args.version,
+        '-e DB_NAME': args.dbname,
+    }
+    subargs = {}
+    return service, env, subargs
+
+
+@subcommand
+def dropdb(args, pos, ctx):
+    pass
+
+
+@subcommand
+def fork(args, pos, ctx):
+    pass
+
+
+def main():
+    args, positionals = parse_arguments()
+    ctx = resolve_context()  # from globals?
+    args.func(args, positionals, ctx)
+    exit(0)
+
+
+if __name__ == '__main__':
+    main()
