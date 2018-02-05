@@ -101,6 +101,22 @@ def parse_arguments():
         func=test,
     )
 
+    # `INSTALL`
+    parser_install = subparsers.add_parser(
+        'install',
+        help='install given list of modules')
+    parser_install.set_defaults(
+        func=install,
+    )
+
+    # `UPGRADE`
+    parser_upgrade = subparsers.add_parser(
+        'upgrade',
+        help='upgrade given list of modules')
+    parser_upgrade.set_defaults(
+        func=upgrade,
+    )
+
     return parser.parse_known_args()
 
 
@@ -250,6 +266,36 @@ def shell(args, pos, ctx):
         'shell-interface': 'ipython',
     }
     rest = pos
+    return service, servicecmd, runtime, env, subargs, rest
+
+
+@subcommand
+def install(args, pos, ctx):
+    service = 'odoo'
+    servicecmd = 'odoo'
+    runtime = {}
+    env = {
+        'MIGRATE': False,
+    }
+    subargs = {
+        'stop-after-init': None,
+    }
+    rest = ['-i {}'.format(arg) for arg in pos]
+    return service, servicecmd, runtime, env, subargs, rest
+
+
+@subcommand
+def upgrade(args, pos, ctx):
+    service = 'odoo'
+    servicecmd = 'odoo'
+    runtime = {}
+    env = {
+        'MIGRATE': False,
+    }
+    subargs = {
+        'stop-after-init': None,
+    }
+    rest = ['-u {}'.format(arg) for arg in pos]
     return service, servicecmd, runtime, env, subargs, rest
 
 
