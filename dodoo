@@ -140,9 +140,9 @@ def squash(args, prefix='', argprefix='-', separator='='):
 
 def dodoo_execute(cmd, args):
     if not args.dryrun:
-        pprint('Executing {}'.format(cmd), log_decoration=' :: ')
+        pprint('EXECUTING {}'.format(cmd), log_decoration=' :: ')
     else:
-        pprint('Would execute {}'.format(cmd), log_decoration=' -- ')
+        pprint('WOULD EXECUTE {}'.format(cmd), log_decoration=' -- ')
     not args.dryrun and os.system(cmd)
 
 
