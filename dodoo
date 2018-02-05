@@ -135,14 +135,20 @@ def resolve_context(args):
     ctx = {
         # TODO: drop extra dependency? this could be resolved by bare os.system
         'repo': Repository(discover_repository(os.getcwd())),
+        'override_env': {}
     }
 
     if args.core:
         args.dbname = 'odoodb'
     elif args.scratch:
         args.dbname = 'scratch'
+        ctx['override_env']['MIGRATE'] = False
     elif args.test:
         args.dbname = 'testdb'
+        ctx['override_env']['MIGRATE'] = False
+    else:
+        if not args.dbname:
+            args.dbname = ctx.get('repo').head.shorthand
 
     return ctx
 
