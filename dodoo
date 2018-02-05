@@ -30,7 +30,6 @@ def parse_arguments():
 
     dbnames = parser.add_mutually_exclusive_group()
     dbnames.add_argument('--core', action='store_true')
-    dbnames.add_argument('--curr', action='store_true')
     dbnames.add_argument('--test', action='store_true')
     dbnames.add_argument('--scratch', action='store_true')
 
@@ -92,17 +91,30 @@ def _default_dbname():
         return branch
 
 
-def resolve_context():
+def resolve_context(args):
     ctx = {
         # TODO: drop extra dependency? this could be resolved by bare os.system
         'repo': Repository(discover_repository(os.getcwd())),
     }
+
+    if args.core:
+        ctx['override_db'] = 'odoodb'
+    elif args.scratch:
+        ctx['override_db'] = 'scratch'
+    elif args.test:
+        ctx['override_db'] = 'test'
+
     return ctx
 
 
 def squash_args(args):
     """Flatten a dictionary of arguments into a single string. """
     return ' '.join('{}={}'.format(k, v) for k, v in args.items())
+
+
+def dodoo_execute(cmd):
+    pprint('Executing {}'.format(cmd))
+    os.system(cmd)
 
 
 def subcommand(f, *args, **kwargs):
@@ -121,9 +133,8 @@ def subcommand(f, *args, **kwargs):
         env, subargs = map(squash_args, (env, subargs))
         cmd = 'docker-compose run --rm {env} {service} {subargs}'.format(
             env=env, service=service, subargs=subargs)
+        dodoo_execute(cmd)
         # TODO make it pretty :D
-        pprint('Executing {}'.format(cmd))
-        os.system(cmd)
     return wrapper
 
 
@@ -171,7 +182,7 @@ def fork(args, pos, ctx):
 
 def main():
     args, positionals = parse_arguments()
-    ctx = resolve_context()  # from globals?
+    ctx = resolve_context(args)
     args.func(args, positionals, ctx)
     exit(0)
 
