@@ -70,6 +70,7 @@ def parse_arguments():
     parser_dropdb = subparsers.add_parser(
         'dropdb',
         help='get rid of a specified database')
+    parser_dropdb.add_argument('--force', action='store_true')
 
     parser_dropdb.set_defaults(
         func=dropdb,
