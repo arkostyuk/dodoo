@@ -248,9 +248,39 @@ def dropdb(args, pos, ctx):
     return service, servicecmd, runtime, env, subargs, rest
 
 
-@subcommand
 def fork(args, pos, ctx):
-    pass
+    _fork_templatedb(args, pos, ctx)
+    _fork_filestore(args, pos, ctx)
+
+
+@subcommand
+def _fork_templatedb(args, pos, ctx):
+    service = 'odoo'
+    servicecmd = 'createdb'
+    runtime = {}
+    env = {}
+    subargs = {
+        'template': 'odoodb',
+    }
+    rest = [args.dbname] + pos
+    return service, servicecmd, runtime, env, subargs, rest
+
+
+@subcommand
+def _fork_filestore(args, pos, ctx):
+    service = 'odoo'
+    servicecmd = 'cp'
+    runtime = {}
+    env = {}
+    subargs = {
+        'recursive': None,
+        'force': None,
+    }
+    rest = [
+        '/data/odoo/filestore/odoodb',
+        '/data/odoo/filestore/{}'.format(args.dbname)
+    ] + pos
+    return service, servicecmd, runtime, env, subargs, rest
 
 
 @subcommand
