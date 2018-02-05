@@ -314,6 +314,43 @@ def shell(args, pos, ctx):
 
 
 @subcommand
+def test(args, pos, ctx):
+    service = 'odoo'
+    servicecmd = 'odoo'
+    runtime = {}
+    env = {
+        'MIGRATE': False,
+        'DEMO': True,
+        'DB_NAME': 'testdb',
+    }
+    subargs = {
+        'workers': 0,
+        'test-enable': None,
+        'stop-after-init': None,
+    }
+    rest = ['-u {}'.format(arg) for arg in pos]
+    return service, servicecmd, runtime, env, subargs, rest
+
+
+@subcommand
+def pytest(args, pos, ctx):
+    # FIXME
+    service = 'odoo'
+    servicecmd = 'pytest'
+    runtime = {}
+    env = {
+        'MIGRATE': False,
+        'DEMO': True,
+        'DB_NAME': 'testdb',
+    }
+    subargs = {
+        'workers': 0,
+    }
+    rest = ['-u {}'.format(arg) for arg in pos]
+    return service, servicecmd, runtime, env, subargs, rest
+
+
+@subcommand
 def install(args, pos, ctx):
     service = 'odoo'
     servicecmd = 'odoo'
