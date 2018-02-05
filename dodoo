@@ -154,7 +154,7 @@ def squash(args, prefix='', argprefix='-', separator='='):
         if v is None:
             # pass a bare key w/out it's value for a long flags
             # like --stop-after-init
-            res.append(str(k))
+            res.append('{}{}'.format(argprefix, k))
         else:
             cval = '{}{}{}{}'.format(argprefix, k, separator, v)
             if prefix:
@@ -207,6 +207,7 @@ def run(args, pos, ctx):
         'p': '{}:8069'.format(args.port),
     }
     env = {
+        'DB_NAME': args.dbname,
     }
     subargs = {
         'log-handler': 'werkzeug:WARNING' if args.quiet else "''",
@@ -243,11 +244,15 @@ def dropdb(args, pos, ctx):
     service = 'odoo'
     servicecmd = 'dropdb'
     runtime = {}
-    env = {
-        'DBNAME': ctx.get('override_db') or args.dbname
-    }
+    env = {}
     subargs = {}
-    rest = pos
+    rest = ' '.join(pos)
+    # If a database was specified in a runtime env, pass it as a positional arg
+    db_to_drop = pos[0] if len(pos) > 0 else args.dbname
+    if db_to_drop == 'odoodb' and not args.force:
+        pprint('Nononoo! Pass --force pls.')
+        exit(1)
+    rest = [db_to_drop] + pos[1:]
     return service, servicecmd, runtime, env, subargs, rest
 
 
