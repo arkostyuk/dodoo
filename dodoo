@@ -26,13 +26,19 @@ def parse_arguments():
         'C2C dockerized Odoo architecture.')
 
     # Global arguments
-    parser.add_argument('-d', '-db', '--dbname')
-    parser.add_argument('-n', '--dryrun', action='store_true')
+    parser.add_argument(
+        '-db', '--dbname', help='database name to operate onto')
+    parser.add_argument(
+        '-n', '--dryrun', action='store_true',
+        help='only print commands instead of execution')
 
     dbnames = parser.add_mutually_exclusive_group()
-    dbnames.add_argument('--core', action='store_true')
-    dbnames.add_argument('--test', action='store_true')
-    dbnames.add_argument('--scratch', action='store_true')
+    dbnames.add_argument(
+        '--core', action='store_true', help='run on: odoodb')
+    dbnames.add_argument(
+        '--test', action='store_true', help='..: testdb, MIGRATE=False')
+    dbnames.add_argument(
+        '--scratch', action='store_true', help='..: scratch, MIGRATE=False')
 
     # Subcommands
     subparsers = parser.add_subparsers()
@@ -73,7 +79,7 @@ def parse_arguments():
     # `FORK`
     parser_fork = subparsers.add_parser(
         'fork',
-        help='clone the core (odoodb) database, name it like current branch')
+        help='clone core db (odoodb), name it like current branch')
     parser_fork.set_defaults(
         func=fork,
     )
@@ -81,8 +87,7 @@ def parse_arguments():
     # `TEST`
     parser_test = subparsers.add_parser(
         'test',
-        help='upgrade the given module while running tests on it',
-    )
+        help='upgrade the given module(s) while running tests on it')
     parser_test.set_defaults(
         func=test,
     )
