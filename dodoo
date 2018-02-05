@@ -84,6 +84,15 @@ def parse_arguments():
         func=fork,
     )
 
+    # `SHELL`
+    parser_shell = subparsers.add_parser(
+        'shell',
+        help='launch a minimal Odoo instance that allows env access',
+    )
+    parser_shell.set_defaults(
+        func=shell,
+    )
+
     # `TEST`
     parser_test = subparsers.add_parser(
         'test',
@@ -226,6 +235,22 @@ def dropdb(args, pos, ctx):
 @subcommand
 def fork(args, pos, ctx):
     pass
+
+
+@subcommand
+def shell(args, pos, ctx):
+    service = 'odoo'
+    servicecmd = 'odoo shell'
+    runtime = {}
+    env = {
+        'MIGRATE': False,
+        'DB_NAME': args.dbname,
+    }
+    subargs = {
+        'shell-interface': 'ipython',
+    }
+    rest = pos
+    return service, servicecmd, runtime, env, subargs, rest
 
 
 def main():
