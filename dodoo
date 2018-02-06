@@ -56,7 +56,7 @@ def parse_arguments():
         help='start a one-off Odoo service')
     parser_run.add_argument(
         '-p', '--port', default=80, help='port to allocate')
-    parser_run.add_argument('-q', '--quiet', action='store_true')
+    parser_run.add_argument('-v', '--verbose', action='store_true')
     parser_run.set_defaults(
         func=run,
         port=80,
@@ -233,7 +233,8 @@ def run(args, pos, ctx):
     subargs = {
         'workers': 0,
     }
-    if args.quiet:
+    if not args.verbose:
+        # suppress werkzeug logs
         subargs['log-handler'] = 'werkzeug:WARNING'
 
     rest = pos
