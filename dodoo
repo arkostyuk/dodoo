@@ -140,14 +140,16 @@ def resolve_context(args):
         'override_env': {}
     }
 
+    override_env = ctx['override_env']
+
     if args.core:
         args.dbname = 'odoodb'
     elif args.scratch:
         args.dbname = 'scratch'
-        ctx['override_env']['MIGRATE'] = False
+        override_env['MIGRATE'] = False
     elif args.test:
         args.dbname = 'testdb'
-        ctx['override_env']['MIGRATE'] = False
+        override_env['MIGRATE'] = False
     else:
         if not args.dbname:
             args.dbname = ctx.get('repo').head.shorthand
