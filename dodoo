@@ -128,17 +128,6 @@ def parse_arguments():
     return parser.parse_known_args()
 
 
-def _default_dbname():
-    branch = resolve_context().get('repo').head.shorthand
-    print('Running on branch {}'.format(branch))
-    if branch == 'HEAD':  # detached head state
-        return 'scratch'
-    elif branch == 'master':  # core
-        return 'odoodb'
-    else:
-        return branch
-
-
 def resolve_context(args):
     ctx = {
         # TODO: drop extra dependency? this could be resolved by bare os.system
@@ -148,6 +137,7 @@ def resolve_context(args):
 
     override_env = ctx['override_env']
 
+    # --core, --test and --scratch take precedence over --dbname
     if args.core:
         args.dbname = 'odoodb'
     elif args.scratch:
@@ -158,7 +148,17 @@ def resolve_context(args):
         override_env['MIGRATE'] = False
     else:
         if not args.dbname:
-            args.dbname = ctx.get('repo').head.shorthand
+            # if neither one of --core, --test or --scratch
+            # nor explicit --dbname was given, then try to guess it
+            pprint('Guessing database name...')
+            branch = ctx['repo'].head.shorthand
+            if branch == 'HEAD':  # detached head state
+                args.dbname = 'scratch'
+            elif branch == 'master':  # core
+                args.dbname = 'odoodb'
+            else:
+                args.dbname = branch
+            pprint('Assuming you meant to operate on {}.'.format(args.dbname))
 
     if args.nomig:
         override_env['MIGRATE'] = False
