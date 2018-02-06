@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 import argparse
-from pygit2 import Repository, discover_repository
 import os
 import sys
 from functools import wraps
+
+from pygit2 import Repository, discover_repository
 
 
 def pprint(msg, log_decoration=' :: '):
