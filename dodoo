@@ -32,6 +32,12 @@ def parse_arguments():
     parser.add_argument(
         '-n', '--dryrun', action='store_true',
         help='only print commands instead of execution')
+    parser.add_argument(
+        '--nomig', action='store_true',
+        help='force migration disabling')
+    parser.add_argument(
+        '--demo', action='store_true',
+        help='install demodata on startup')
 
     dbnames = parser.add_mutually_exclusive_group()
     dbnames.add_argument(
@@ -153,6 +159,12 @@ def resolve_context(args):
     else:
         if not args.dbname:
             args.dbname = ctx.get('repo').head.shorthand
+
+    if args.nomig:
+        override_env['MIGRATE'] = False
+
+    if args.demo:
+        override_env['DEMO'] = True
 
     return ctx
 
