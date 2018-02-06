@@ -232,9 +232,11 @@ def run(args, pos, ctx):
         'DB_NAME': args.dbname,
     }
     subargs = {
-        'log-handler': 'werkzeug:WARNING' if args.quiet else "''",
         'workers': 0,
     }
+    if args.quiet:
+        subargs['log-handler'] = 'werkzeug:WARNING'
+
     rest = pos
     return service, servicecmd, runtime, env, subargs, rest
 
