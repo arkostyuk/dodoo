@@ -156,7 +156,7 @@ def resolve_context(args):
             elif branch == 'master':  # core
                 args.dbname = 'odoodb'
             else:
-                args.dbname = branch
+                args.dbname = branch.replace('/', '-')
             pprint('Assuming you meant to operate on {}.'.format(args.dbname))
 
     if args.nomig:
