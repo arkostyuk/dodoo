@@ -108,6 +108,13 @@ def parse_arguments():
         func=test,
     )
 
+    parser_sing = subparsers.add_parser(
+        'sing',
+        help='run a specified Anthem song')
+    parser_sing.set_defaults(
+        func=sing,
+    )
+
     # `INSTALL`
     parser_install = subparsers.add_parser(
         'install',
@@ -366,6 +373,17 @@ def pytest(args, pos, ctx):
         'workers': 0,
     }
     rest = ['-u {}'.format(arg) for arg in pos]
+    return service, servicecmd, runtime, env, subargs, rest
+
+
+@subcommand
+def sing(args, pos, ctx):
+    service = 'odoo'
+    servicecmd = 'anthem'
+    runtime = {}
+    env = {}
+    subargs = {}
+    rest = [arg.replace('/', '.') for arg in pos]
     return service, servicecmd, runtime, env, subargs, rest
 
 
