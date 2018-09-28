@@ -1,10 +1,67 @@
-#!/usr/bin/env python
+#!/usr/bin/python
+# Copyright (C) 2018 by Camptocamp
+# License AGPL-3.0 or later (http://www.gnu.org/licenses/agpl.html).
 import argparse
 import os
+import re
 import sys
 from functools import wraps
 
 from pygit2 import Repository, discover_repository
+
+
+def normalize_branch_name(branch):
+    """Convert real branch name to at least PSQL-compatible."""
+    return branch.replace('/', '-')
+
+
+class Context(object):
+    def __init__(self, args):
+        self.cwd = os.getcwd()
+        if args.func is spinup:
+            # we don't need any context, except for cwd
+            return
+        try:
+            self.repo = Repository(discover_repository(self.cwd))
+        except KeyError:
+            exit("Suspicious, this directory doesn't look like a repo...")
+        self.override_env = {}
+
+        # --core, --test and --scratch take precedence over --dbname
+        # unless --current is provided
+        if args.core:
+            args.dbname = 'odoodb'
+        elif args.scratch:
+            args.dbname = 'scratch'
+            self.override_env['MIGRATE'] = False
+        elif args.test:
+            args.dbname = 'testdb'
+            self.override_env['DEMO'] = True
+            self.override_env['MIGRATE'] = False
+        else:
+            # self.branch = os.getenv('OOO_DBNAME')
+            if not args.dbname:
+                # if neither one of --core, --test or --scratch
+                # nor explicit --dbname was given, then try to guess it
+                # fst - try to read .dodoorc
+                pprint('Guessing database name...')
+                branch = self.repo.head.shorthand
+                if branch == 'HEAD':  # detached head state
+                    args.dbname = 'scratch'
+                elif branch == 'master':  # core
+                    args.dbname = 'odoodb'
+                else:
+                    args.dbname = normalize_branch_name(branch)
+                pprint('Assuming you meant to operate on {}.'
+                       .format(args.dbname))
+
+        if args.nomig:
+            self.override_env['MIGRATE'] = False
+
+        if args.demo:
+            self.override_env['DEMO'] = True
+
+        self.module = os.getenv('MOD')
 
 
 def pprint(msg, log_decoration=' :: '):
@@ -46,6 +103,9 @@ def parse_arguments():
         '--test', action='store_true', help='..: testdb, MIGRATE=False')
     dbnames.add_argument(
         '--scratch', action='store_true', help='..: scratch, MIGRATE=False')
+    dbnames.add_argument(
+        '--current', action='store_true',
+        help='try to guess database anyways (may be useful in testing)')
 
     # Subcommands
     subparsers = parser.add_subparsers()
@@ -56,7 +116,12 @@ def parse_arguments():
         help='start a one-off Odoo service')
     parser_run.add_argument(
         '-p', '--port', default=80, help='port to allocate')
-    parser_run.add_argument('-v', '--verbose', action='store_true')
+    parser_run.add_argument(
+        '-v', '--verbose', action='store_true',
+        help='do not suppress werkzeug::INFO logs')
+    parser_run.add_argument(
+        '--background', action='store_true',
+        help='do not expose port')
     parser_run.set_defaults(
         func=run,
         port=80,
@@ -66,10 +131,16 @@ def parse_arguments():
     parser_migrate = subparsers.add_parser(
         'migrate',
         help='migrate a specified database to the given version')
-    parser_migrate.add_argument('version')
+    parser_migrate.add_argument('-v', '--version')
+    parser_migrate.add_argument('-m', '--mode')
+    parser_migrate.add_argument(
+        '--latest', action='store_true',
+        help='shortcut for --version latest')
+    parser_migrate.add_argument(
+        '-a', '--all',
+        help='run every migration')
     parser_migrate.set_defaults(
         func=migrate,
-        version='latest',
     )
 
     # `DROPDB`
@@ -77,7 +148,12 @@ def parse_arguments():
         'dropdb',
         help='get rid of a specified database')
     parser_dropdb.add_argument('--force', action='store_true')
-
+    parser_dropdb.add_argument(
+        '--cleanup', action='store_true',
+        help='drop everything except for odoodb (TBD)')
+    parser_dropdb.add_argument(
+        '--keep', action='append',
+        help='database names to preserve, one DB per --keep entry')
     parser_dropdb.set_defaults(
         func=dropdb,
         dbname=False,
@@ -87,8 +163,19 @@ def parse_arguments():
     parser_fork = subparsers.add_parser(
         'fork',
         help='clone core db (odoodb), name it like current branch')
+    parser_fork.add_argument(
+        '-t', '--template', help='database to use as a template')
     parser_fork.set_defaults(
         func=fork,
+        template='odoodb',
+    )
+
+    # `PSQL`
+    parser_psql = subparsers.add_parser(
+        'psql',
+        help='launch an psql shell')
+    parser_psql.set_defaults(
+        func=psql,
     )
 
     # `SHELL`
@@ -107,10 +194,21 @@ def parse_arguments():
     parser_test.set_defaults(
         func=test,
     )
+    # `PYTEST`
+    parser_pytest = subparsers.add_parser(
+        'pytest',
+        help='given the root directory, locate and run pytests on it')
+    parser_pytest.set_defaults(
+        func=pytest,
+    )
 
+    # `SING`
     parser_sing = subparsers.add_parser(
         'sing',
         help='run a specified Anthem song')
+    parser_sing.add_argument(
+        '-i', '--interactive', action='store_true',
+    )
     parser_sing.set_defaults(
         func=sing,
     )
@@ -131,6 +229,28 @@ def parse_arguments():
         func=upgrade,
     )
 
+    # `SPINUP`
+    parser_spinup = subparsers.add_parser(
+        'spinup',
+        help='set up a new project (TBD)')
+    parser_spinup.add_argument('projectname')
+    parser_spinup.set_defaults(
+        func=spinup,
+    )
+
+    # `HIJACK`
+    parser_hijack = subparsers.add_parser(
+        'hijak',
+        help='reassign database',
+    )
+    parser_hijack.add_argument(
+        '--dbfrom',
+        help='database name to hijack (defaults to previous branch)',
+    )
+    parser_hijack.set_defaults(
+        func=hijack,
+    )
+
     return parser.parse_known_args()
 
 
@@ -140,37 +260,6 @@ def resolve_context(args):
         'repo': Repository(discover_repository(os.getcwd())),
         'override_env': {}
     }
-
-    override_env = ctx['override_env']
-
-    # --core, --test and --scratch take precedence over --dbname
-    if args.core:
-        args.dbname = 'odoodb'
-    elif args.scratch:
-        args.dbname = 'scratch'
-        override_env['MIGRATE'] = False
-    elif args.test:
-        args.dbname = 'testdb'
-        override_env['MIGRATE'] = False
-    else:
-        if not args.dbname:
-            # if neither one of --core, --test or --scratch
-            # nor explicit --dbname was given, then try to guess it
-            pprint('Guessing database name...')
-            branch = ctx['repo'].head.shorthand
-            if branch == 'HEAD':  # detached head state
-                args.dbname = 'scratch'
-            elif branch == 'master':  # core
-                args.dbname = 'odoodb'
-            else:
-                args.dbname = branch.replace('/', '-')
-            pprint('Assuming you meant to operate on {}.'.format(args.dbname))
-
-    if args.nomig:
-        override_env['MIGRATE'] = False
-
-    if args.demo:
-        override_env['DEMO'] = True
 
     return ctx
 
@@ -214,7 +303,7 @@ def subcommand(f, *args, **kwargs):
         initial_args, pos, ctx = args
         service, servicecmd, runtime, env, subargs, rest = f(*args, **kwargs)
         runtime = squash(runtime, prefix='', argprefix='-', separator=' ')
-        env.update(ctx.get('override_env'))
+        env.update(ctx.override_env)
         env = squash(env, prefix='-e', argprefix='', separator='=')
         subargs = squash(subargs, prefix='', argprefix='--', separator='=')
         rest = ' '.join(rest)
@@ -227,51 +316,112 @@ def subcommand(f, *args, **kwargs):
     return wrapper
 
 
+def database_matters(f, *args, **kwargs):
+    """Ensures that 'DB_NAME' key is present in env."""
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        initial_args, pos, ctx = args
+        service, servicecmd, runtime, env, subargs, rest = f(*args, **kwargs)
+        if 'DB_NAME' not in env:
+            env['DB_NAME'] = initial_args.dbname
+        return service, servicecmd, runtime, env, subargs, rest
+    return wrapper
+
+
+def respects_environ_module(f, *args, **kwargs):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        initial_args, pos, ctx = args
+        if not pos and isinstance(pos, list):
+            if ctx.module:
+                pprint("Assuming you meant to run it on '{}' module "
+                       "($MOD variable found in os.environ)"
+                       .format(ctx.module))
+                pos.append(ctx.module)
+            else:
+                pprint('No $MOD variable found in os.environ.')
+        return f(*args, **kwargs)
+    return wrapper
+
+
 @subcommand
+@database_matters
 def run(args, pos, ctx):
     service = 'odoo'
     servicecmd = 'odoo'
-    runtime = {
-        'p': '{}:8069'.format(args.port),
-    }
-    env = {
-        'DB_NAME': args.dbname,
-    }
+    runtime = {}
+    if not args.background:
+        runtime['p'] = '{}:8069'.format(args.port)
+    env = {}
     subargs = {
         'workers': 0,
     }
     if not args.verbose:
-        # suppress werkzeug logs
-        subargs['log-handler'] = 'werkzeug:WARNING'
+        # suppress loud and messy periodic logs
+        # fuck, that's a dict, my ass
+        loud_loggers = [
+            'werkzeug',
+            # 'odoo.addons.base.ir.ir_cron',
+        ]
+        subargs['log-handler'] = ','.join([
+            '{}:WARNING'.format(logger)
+            for logger in loud_loggers
+        ])
 
     rest = pos
     return service, servicecmd, runtime, env, subargs, rest
 
 
 @subcommand
+@database_matters
 def migrate(args, pos, ctx):
+    # `migrate` doesn't care about MIGRATE env var,
+    # so it's fine to run this on test/scratch dbs.
     service = 'odoo'
     servicecmd = 'migrate'
     runtime = {}
+    version_pattern = re.compile('^\s*-\s*version:')
+    # Apply the `--latest` shortcut
+    if args.latest:
+        # overrides any `--version` provided, just to state that
+        args.version = 'latest'
     if args.version == 'latest':
         migration_file = os.path.join(
-            ctx['repo'].workdir, 'odoo', 'migration.yml')
+            ctx.repo.workdir, 'odoo', 'migration.yml')
         with open(migration_file, 'r') as migration_yml:
             for line in reversed(list(migration_yml)):
-                if 'version:' in line:
+                kek = re.match(version_pattern, line)
+                if kek:
                     args.version = line.split()[-1]
                     break
-    env = {
-        'MARABUNTA_FORCE_VERSION': args.version,
-        'DB_NAME': args.dbname,
-    }
+            else:
+                pprint('FATAL: No versions in migration.yml were found.')
+                exit(1)
+    env = {}
+    if args.version:
+        env['MARABUNTA_FORCE_VERSION'] = args.version
+    if args.mode:
+        env['MARABUNTA_MODE'] = args.mode
     subargs = {}
     rest = pos
     return service, servicecmd, runtime, env, subargs, rest
 
 
-@subcommand
 def dropdb(args, pos, ctx):
+    """Wrapper around regular dropdb, cleans up filestore in addition."""
+    _dropdb_dropdb(args, pos, ctx)
+    _dropdb_filestore(args, pos, ctx)
+
+
+@subcommand
+def _dropdb_dropdb(args, pos, ctx):
+    if args.cleanup:
+        # XXX: WIP
+        raise NotImplementedError('Still TBD, sry')
+        # drop everything except for `odoodb`
+        if args.keep:
+            dbtopreserve = ', '.join(args.keep)
+
     service = 'odoo'
     servicecmd = 'dropdb'
     runtime = {}
@@ -281,15 +431,51 @@ def dropdb(args, pos, ctx):
     # If a database was specified in a runtime env, pass it as a positional arg
     db_to_drop = pos[0] if len(pos) > 0 else args.dbname
     if db_to_drop == 'odoodb' and not args.force:
-        pprint('Nononoo! Pass --force pls.')
+        print
+        pprint('Entering `FREND HOLD UP\' mode')
+        pprint('Pass --force if you really dare to drop the core database m8.')
         exit(1)
+    elif db_to_drop == 'odoodb':
+        print
+        pprint(' * Last chance to reconsider *')
+        pprint('U\'re about to drop core db; proceed?')
+        pprint('(kill w/ C-c now or proceed by hitting RET)')
+        try:
+            sys.stdin.read(1)
+        except KeyboardInterrupt:
+            pprint('As u wish. Interrupting.', log_decoration=': ')
+            exit(0)
+        else:
+            pprint('Don\'t tell that I haven\'t warned u.')
+            print
+
     rest = [db_to_drop] + pos[1:]
+    return service, servicecmd, runtime, env, subargs, rest
+
+
+@subcommand
+def _dropdb_filestore(args, pos, ctx):
+    """Runs rm -rf on this db's filestore dir, thus releasing drive space."""
+    service = 'odoo'
+    servicecmd = 'rm'
+    db_to_drop = pos[0] if len(pos) > 0 else args.dbname
+    runtime = {}
+    env = {}
+    subargs = {
+        'recursive': None,
+        'force': None,
+    }
+    rest = [
+        '/data/odoo/filestore/{}'.format(db_to_drop),
+    ]
+    # XXX: why + pos was there?
     return service, servicecmd, runtime, env, subargs, rest
 
 
 def fork(args, pos, ctx):
     _fork_templatedb(args, pos, ctx)
     _fork_filestore(args, pos, ctx)
+    _fork_chown_filestore(args, pos, ctx)
 
 
 @subcommand
@@ -299,8 +485,12 @@ def _fork_templatedb(args, pos, ctx):
     runtime = {}
     env = {}
     subargs = {
-        'template': 'odoodb',
+        # TODO s/w/database_matters?
+        'template': args.template,  # defaults to odoodb
     }
+    # TODO
+    # if args.hijack:
+    #     # use last known branch database to template a new one
     rest = [args.dbname] + pos
     return service, servicecmd, runtime, env, subargs, rest
 
@@ -317,20 +507,48 @@ def _fork_filestore(args, pos, ctx):
         'no-target-directory': None,
     }
     rest = [
-        '/data/odoo/filestore/odoodb',
-        '/data/odoo/filestore/{}'.format(args.dbname)
+        '/data/odoo/filestore/{}'.format(args.template),
+        '/data/odoo/filestore/{}'.format(args.dbname),
     ] + pos
     return service, servicecmd, runtime, env, subargs, rest
 
 
 @subcommand
+def _fork_chown_filestore(args, pos, ctx):
+    service = 'odoo'
+    servicecmd = 'chown'
+    runtime = {}
+    env = {}
+    subargs = {
+        'recursive': None,
+    }
+    rest = [
+        'odoo:odoo',
+        '/data/odoo/filestore/{}'.format(args.dbname),
+    ] + pos
+    return service, servicecmd, runtime, env, subargs, rest
+
+
+@subcommand
+@database_matters
+def psql(args, pos, ctx):
+    service = 'odoo'
+    servicecmd = 'psql'
+    runtime = {}
+    env = {}
+    subargs = {}
+    rest = pos
+    return service, servicecmd, runtime, env, subargs, rest
+
+
+@subcommand
+@database_matters
 def shell(args, pos, ctx):
     service = 'odoo'
     servicecmd = 'odoo shell'
     runtime = {}
     env = {
         'MIGRATE': False,
-        'DB_NAME': args.dbname,
     }
     subargs = {
         'shell-interface': 'ipython',
@@ -340,25 +558,31 @@ def shell(args, pos, ctx):
 
 
 @subcommand
+@database_matters
+@respects_environ_module
 def test(args, pos, ctx):
+    """Launch Odoo tests against the database."""
+    # TODO try 2 filter out headings in output logs
     service = 'odoo'
     servicecmd = 'odoo'
     runtime = {}
     env = {
         'MIGRATE': False,
         'DEMO': True,
-        'DB_NAME': 'testdb',
+        'DB_NAME': args.current and args.dbname or 'testdb',
     }
     subargs = {
         'workers': 0,
         'test-enable': None,
         'stop-after-init': None,
     }
-    rest = ['-u {}'.format(arg) for arg in pos]
+    rest = ['-i {}'.format(arg) for arg in pos]
     return service, servicecmd, runtime, env, subargs, rest
 
 
 @subcommand
+@database_matters
+@respects_environ_module
 def pytest(args, pos, ctx):
     # FIXME
     service = 'odoo'
@@ -367,27 +591,37 @@ def pytest(args, pos, ctx):
     env = {
         'MIGRATE': False,
         'DEMO': True,
-        'DB_NAME': 'testdb',
+        'DB_NAME': args.current and args.dbname or 'testdb',
     }
     subargs = {
-        'workers': 0,
+        'capture': 'no',
     }
-    rest = ['-u {}'.format(arg) for arg in pos]
+    rest = pos
     return service, servicecmd, runtime, env, subargs, rest
 
 
 @subcommand
+@database_matters
 def sing(args, pos, ctx):
     service = 'odoo'
     servicecmd = 'anthem'
     runtime = {}
     env = {}
     subargs = {}
-    rest = [arg.replace('/', '.') for arg in pos]
+    if args.interactive:
+        subargs['interactive'] = None
+    rest = [arg.replace('/', '.').replace('.py', '') for arg in pos]
+    rest = [arg if '::' in arg else arg + '::main' for arg in rest]
+    rest = [arg if not arg.startswith('odoo')
+            else '.'.join(arg.split('.')[1:]) for arg in rest]
+    # TODO: mimic
+    # dodoo_execute "$DCR -e DB_NAME=$DBNAME odoo anthem $@"
     return service, servicecmd, runtime, env, subargs, rest
 
 
 @subcommand
+@database_matters
+@respects_environ_module
 def install(args, pos, ctx):
     service = 'odoo'
     servicecmd = 'odoo'
@@ -403,6 +637,8 @@ def install(args, pos, ctx):
 
 
 @subcommand
+@database_matters
+@respects_environ_module
 def upgrade(args, pos, ctx):
     service = 'odoo'
     servicecmd = 'odoo'
@@ -417,9 +653,85 @@ def upgrade(args, pos, ctx):
     return service, servicecmd, runtime, env, subargs, rest
 
 
+@subcommand
+def spinup(args, pos, ctx):
+    exit('still under construction, sorry :3')
+    # TODO those really shouldnt be hardcoded
+    homedir = os.getenv('HOME')
+    odoo_repo_origin = '{}/develop/src/odoo'.format(homedir)
+    odoo_repo_path = './odoo/src'
+    # this one is listening to Github, so we gotta sync it first
+    import pdb; pdb.set_trace()
+    core_odoo_repo = Repository(odoo_repo_origin)
+    core_odoo_repo.fetch()
+    # this one is a mirror of a local copy
+    odoo_repo = Repository(odoo_repo_path)
+    odoo_repo.clone(odoo_repo_origin)
+    magic()
+
+
+def hijack(args, pos, ctx):
+    # supply default `dbfrom`
+    if not args.dbfrom:
+        pprint('Yup, would be nice to supply default to dbfrom.')
+        pprint('...but, for now, u have to set it manually :/')
+        pprint('using {} as it is the first POS entry'.format(pos[0]))
+
+        # hacky, consider refactoring...
+        head_reflog = ctx.repo.head.log()
+        head_reflog.next()
+        try:
+            while True:
+                # XXX: fuck it, go for dodoo checkout or something alike
+                break
+                previous_head = head_reflog.next()
+                previous_branchname = previous_head.False
+        except StopIteration:
+            # one commit repo?
+            fail()  # would crash badly
+
+        args.dbfrom = pos[0]
+    # TODO: fail fast if something gone wrong
+    # would be supremely cool if this would be possible to revert completely
+    _hijack_database(args, pos, ctx)
+    _hijack_filestore(args, pos, ctx)
+
+
+@subcommand
+def _hijack_database(args, pos, ctx):
+    service = 'odoo'
+    servicecmd = 'psql'
+    runtime = {}
+    env = {}
+    # charming :3
+    subargs = {
+        'command': '\'ALTER DATABASE \"{}\" RENAME TO \"{}\"\''.format(
+            args.dbfrom, args.dbname),
+    }
+    rest = pos
+    return service, servicecmd, runtime, env, subargs, rest
+
+
+@subcommand
+def _hijack_filestore(args, pos, ctx):
+    service = 'odoo'
+    servicecmd = 'mv'
+    runtime = {}
+    env = {}
+    subargs = {
+        'force': None,
+        'no-target-directory': None,
+    }
+    rest = [
+        '/data/odoo/filestore/{}'.format(args.dbfrom),
+        '/data/odoo/filestore/{}'.format(args.dbname),
+    ] + pos
+    return service, servicecmd, runtime, env, subargs, rest
+
+
 def main():
     args, positionals = parse_arguments()
-    ctx = resolve_context(args)
+    ctx = Context(args)
     args.func(args, positionals, ctx)
     exit(0)
 
